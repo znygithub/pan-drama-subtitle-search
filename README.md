@@ -4,7 +4,7 @@
 
 **出发点：学外语。**
 
-帮你在网盘里找美剧/英剧，并且为每一集配好**能对轴的字幕**，方便练听力、跟读、中英对照。
+帮你在网盘里找美剧/英剧的Skill，并且为每一集配好**能对轴的字幕**，方便练听力、跟读、中英对照。
 
 > 不是观影推荐。若只是随便看看，请用 Netflix、腾讯视频等正版平台。
 
@@ -58,5 +58,4 @@ python3 scripts/episode_match.py match "风骚律师" \
 ```
 
 ---
-
-[SKILL.md](SKILL.md) · [know-how.md](know-how.md)
+具体Skill的文档：[SKILL.md](SKILL.md) 
