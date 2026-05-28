@@ -10,24 +10,7 @@
 
 ---
 
-## 用户需要怎么做
-
-**在 Cursor 里（推荐）：** 安装 Skill 后直接说：
-
-> 帮我找《绝命毒师》第一季第一集，带字幕，练听力
-
-**自己跑命令（可选）：**
-
-```bash
-docker run -d -p 8000:8000 ghcr.io/lavx/opensubtitles-scraper:latest
-
-python3 scripts/episode_match.py match "绝命毒师" \
-  --sub-query "Breaking Bad" --season 1 --episode 1 --top 10
-```
-
----
-
-## 输出格式是怎样的
+## 输出长什么样（Case）
 
 结果按**三段优先级**输出，每行都是可点击链接（不是文件名）。
 
@@ -39,9 +22,7 @@ python3 scripts/episode_match.py match "绝命毒师" \
 
 **规则：** 网盘标 `[夸克]`/`[阿里]` · 有提取码才写 · 一/二段每行必须有字幕链接
 
----
-
-### Case：《绝命毒师》Breaking Bad · S01E01
+### 《绝命毒师》Breaking Bad · S01E01
 
 #### 一、视频 + 同分享字幕文件（最优先）
 
@@ -67,13 +48,24 @@ python3 scripts/episode_match.py match "绝命毒师" \
 
 > **#3** VLC → 字幕 → 子轨道自查；有内封不用下外挂。备用字幕可能对不上。
 
+> **📚 学习用途说明** — 以上仅供语言学习，请勿传播。观影请支持正版（Netflix / Apple TV+ 等）。
+
 ---
 
-**📚 学习用途说明**
+## 用户需要怎么做
 
-以上仅供**语言学习**（练听力、跟读、字幕对照），请勿传播。
+**在 Cursor 里（推荐）：** 安装 Skill 后直接说：
 
-若只是观影娱乐，建议正版：**国内** 可搜哔哩哔哩部分片段；**国际** Netflix / Apple TV+ 等。
+> 帮我找《绝命毒师》第一季第一集，带字幕，练听力
+
+**自己跑命令（可选）：**
+
+```bash
+docker run -d -p 8000:8000 ghcr.io/lavx/opensubtitles-scraper:latest
+
+python3 scripts/episode_match.py match "绝命毒师" \
+  --sub-query "Breaking Bad" --season 1 --episode 1 --top 10
+```
 
 ---
 
