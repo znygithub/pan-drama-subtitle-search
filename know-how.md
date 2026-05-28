@@ -1,0 +1,224 @@
+# 搜剧 & 配字幕 Know-how
+
+[SKILL.md](SKILL.md) 的五步 SOP 延伸阅读：Query 泛化、多搜视频、按视频配字幕、版本校对。
+
+---
+
+## Query 泛化
+
+网盘搜索和字幕搜索都会**自动尝试多种 query**，不要只搜用户说的那一个词。
+
+### 为什么要泛化
+
+| 情况 | 示例 |
+|------|------|
+| 中文 vs 英文剧名 | 风骚律师 ↔ Better Call Saul |
+| 英文有空格 vs 无空格 | Better Call Saul ↔ BetterCallSaul |
+| 英文用点号分隔 | Better.Call.Saul（网盘文件名常见） |
+| 下划线写法 | Better_Call_Saul |
+| 美剧中文分享 | 剧名 + 「美剧」/「字幕」/「中英字幕」 |
+
+### 网盘搜索（pan / episode_match）
+
+`--sub-query` 传英文原名（或与 `show` 不同的别名），脚本会：
+
+1. 对每个剧名 alias 生成多种写法
+2. 依次尝试：纯剧名 → 剧名+S01E01 → 剧名+美剧 → 剧名+字幕 …
+3. 合并去重所有命中结果（**不**搜到一个就停）
+
+```bash
+# 中文搜网盘 + 英文别名泛化
+pan_drama_search.py search "风骚律师" --sub-query "Better Call Saul" --season 1 --episode 1
+```
+
+### 字幕搜索（subtitle_search / OpenSubtitles）
+
+字幕库以英文为主，优先用英文原名，同样泛化空格/点号：
+
+```bash
+subtitle_search.py find-episode "Better Call Saul" --sub-query "风骚律师" --season 1 --episode 1
+```
+
+内部会依次试：`Better Call Saul` → `BetterCallSaul` → `Better.Call.Saul` → … → 中文名，直到命中。
+
+### Agent 怎么做
+
+- 用户只说中文 → **主动补** `--sub-query` 英文原名（你知道的话）
+- 用户只说英文 → `show` 和 `--sub-query` 可相同，脚本仍会泛化空格/点号
+- 无结果时在回复里说明「已尝试哪些 query 变体」（看返回的 `keywords_tried` / `queries_tried`）
+
+---
+
+## 一、搜视频（不限网盘）
+
+### 原则
+
+- **不限制**夸克 / 阿里 / 百度 / 123 等，PanSou 聚合全搜
+- 只有用户**明确偏好**某网盘时，才加 `--drives quark,aliyun`
+- 搜到分享后**必须校验链接**（expired 的直接丢）
+
+### 搜词策略
+
+| 策略 | 说明 |
+|------|------|
+| **Query 泛化** | 中英文别名 + 空格/无空格/点号，见 [§ Query 泛化](#query-泛化) |
+| 先 broad | 只搜剧名，命中率更高 |
+| 中英文都试 | `--sub-query` 传英文原名 |
+| 季集放参数 | `--season 1 --episode 1`，不要全塞进关键词 |
+| 避免「剧名+字幕」单查 | 泛化流程里会加，但 broad 优先 |
+| 放宽整季 | 单集搜不到 → 去掉 episode，搜整季包再在分享里找 S01E01 |
+
+### 什么样的分享标题更靠谱
+
+- ✅ 含「中英字幕 / 双语 / 内封 / 外挂字幕 / 1080p / BluRay / WEB-DL」
+- ⚠️ 只有「全集 / 合集」→ 需进分享看有没有目标集
+- ❌ 「生肉 / RAW / 无字幕」→ 丢弃（除非降级且无其他选择）
+
+---
+
+## 二、搜字幕
+
+### 来源优先级
+
+1. **同分享内的 `.srt` / `.ass`**（和视频同目录、同名）— 最可靠
+2. **OpenSubtitles**（via `opensubtitles-scraper`）— 按文件名打分配对
+3. **手动字幕站**（SubHD / SubDL / Podnapisi）— 降级兜底
+
+字幕服务不可用时：`docker run -d -p 8000:8000 ghcr.io/lavx/opensubtitles-scraper:latest`
+
+### 搜字幕时的剧名
+
+- 用**英文原名**为主（`--sub-query` 或 find-episode 的第一个参数）
+- 脚本自动泛化：`Better Call Saul` / `BetterCallSaul` / `Better.Call.Saul`
+- 英文无结果再试中文别名
+
+### 语言优先级（语言学习场景）
+
+1. **中英双语**一条 — 对照学习最方便
+2. **中文 + 英文分开** — 可切换练听力 / 练阅读
+3. 仅英文 — 练听力可用
+4. 仅中文 — 兜底
+
+---
+
+## 三、视频 ↔ 字幕怎么对轴
+
+**核心：同一集 + 尽量同一版本。**
+
+### 同分享内配对（最高置信）
+
+进入**任意网盘**分享（夸克、阿里等，能列文件即可），找：
+
+```
+Show.S01E01.1080p.mkv
+Show.S01E01.1080p.zh.srt    ← 中文
+Show.S01E01.1080p.en.srt    ← 英文
+Show.S01E01.1080p.中英.srt  ← 双语
+```
+
+文件名 **stem 相同或互相包含** → 可直接配对。
+
+### OpenSubtitles 打分配对
+
+对每个视频文件，在字幕池里按文件名相似度选最佳：
+
+| 信号 | 加分 | 说明 |
+|------|------|------|
+| SxxExx 一致 | +40 | 必须同一集 |
+| 分辨率一致 | +15 | 1080p / 720p / 2160p |
+| 来源一致 | +12 | WEB-DL / BluRay / REMUX |
+| 发布组一致 | +8 | NF / AMZN 等 |
+| 文件名重叠 | +20 | 主体名互相包含 |
+| 同类型加成 | +10 | BluRay↔BluRay 或 WEB↔WEB |
+| 跨类型扣分 | **-8** | BluRay 视频 + WEB-DL 字幕 |
+| 双语标识 | +30 | 文件名含 中英/双语/bilingual |
+
+### 匹配度怎么读
+
+| 级别 | 含义 | 告诉用户 |
+|------|------|----------|
+| **high** | 同分享同名，或 score≥50 且版本一致 | 可直接用 |
+| **medium** | 集数对，版本可能不同 | 试播；VLC 用 G/H 微调延迟 |
+| **low** | 只对上集数 | **备选，可能对不上**，必须说明 |
+
+---
+
+## 四、MKV 可能自带字幕 — 用户自查（不是 Agent 确认）
+
+MKV 只是容器，**可能有内封字幕轨，也可能没有**。
+
+### Agent 的职责
+
+- ✅ 提醒用户：「这个 MKV **可能**已有字幕，请你先自查」
+- ✅ 给出[自查方法](#自查方法)的链接
+- ✅ 同时给配对的**外挂字幕备选链接**（自查没有再用）
+- ❌ **不要**替用户下载视频后跑 ffprobe
+- ❌ **不要**说「这个 MKV 肯定有字幕」
+
+### 用户决策流程
+
+```
+下载 MKV → 自查有没有字幕轨
+    ├─ 有 → 直接在播放器选字幕轨学习，不需要下载外挂
+    └─ 没有 → 用配对结果里的字幕下载链接，外挂加载
+```
+
+### 自查方法
+
+**方法一：播放器（最简单）**
+
+VLC：打开文件 → **字幕 → 子轨道**（macOS: Subtitle → Sub Track）
+- 列表里有 Chinese / English → **有内封字幕**
+- 只有「禁用」或为空 → **没有**，用外挂链接
+
+IINA（macOS）：右键 → 字幕，查看可选轨道  
+PotPlayer（Windows）：右键 → 字幕 → 字幕语言
+
+VLC 文档：https://wiki.videolan.org/VLC_User_Guide/
+
+**方法二：命令行（下载到本地后）**
+
+```bash
+ffprobe -hide_banner -select_streams s \
+  -show_entries stream=index,codec_name:stream_tags=language \
+  -of compact=p=0:nk=1 "你的文件.mkv"
+```
+
+有 `subtitle` 输出 → 有字幕轨；无输出 → 用外挂链接。
+
+用户也可以把 ffprobe 输出贴给 AI 帮读，但**视频文件得在用户本地**。
+
+**方法三：网盘在线预览（仅供参考）**
+
+夸克/阿里网页预览看有没有 CC/字幕按钮。不如 VLC 可靠，建议二次确认。
+
+---
+
+## 五、输出格式
+
+统一规范 + 完整 Case（《绝命毒师》S01E01）→ **[SKILL.md § 步骤 4](SKILL.md#步骤-4整理输出统一格式)**。
+
+---
+
+## 六、常见坑
+
+| 坑 | 处理 |
+|----|------|
+| BluRay 视频 + WEB-DL 字幕 | 标注 medium/low，提醒可能不同步 |
+| 分享写「内封」实际没有 | 不轻信标题，让用户 VLC 自查 |
+| 只有整季包没有单集文件 | 搜整季，进分享找 SxxExx |
+| OpenSubtitles 服务挂了 | 降级给视频 + 手动字幕站 |
+| 链接 expired | 丢弃，换下一个分享 |
+| 中英双语找不到 | 分开给中文 + 英文两条 |
+
+---
+
+## 七、手动字幕站
+
+| 站点 | 链接 |
+|------|------|
+| SubHD | https://subhdtw.com |
+| SubDL | https://subdl.com/ |
+| OpenSubtitles | https://www.opensubtitles.org/ |
+
+手动搜时对齐规则：同 **SxxExx** + 同 **1080p/WEB-DL/BluRay** + 尽量同发布组。
