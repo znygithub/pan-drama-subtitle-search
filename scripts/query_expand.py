@@ -1,4 +1,4 @@
-"""Query expansion for pan + subtitle search (CN/EN, spacing variants, 美剧)."""
+"""Query expansion: CN name + EN name + 字幕 (keep it small for speed)."""
 
 import re
 
@@ -25,45 +25,9 @@ def is_latin_name(name):
     return bool(re.search(r"[A-Za-z]", s))
 
 
-def latin_name_variants(name):
-    """Better Call Saul → BetterCallSaul, Better.Call.Saul, …"""
-    name = (name or "").strip()
-    if not name:
-        return []
-
-    variants = [name]
-
-    # normalize separators to spaces first
-    core = re.sub(r"[._]+", " ", name)
-    core = re.sub(r"\s+", " ", core).strip()
-    if core and core not in variants:
-        variants.append(core)
-
-    if " " in core:
-        nospace = core.replace(" ", "")
-        variants.append(nospace)
-        variants.append(core.replace(" ", "."))
-        variants.append(core.replace(" ", "_"))
-
-    if "." in name:
-        variants.append(name.replace(".", ""))
-        variants.append(name.replace(".", " "))
-
-    return _dedupe(variants)
-
-
-def expand_show_names(*names):
-    """All alias variants for show names (中文原样 + 英文多种写法)."""
-    out = []
-    for n in names:
-        n = (n or "").strip()
-        if not n:
-            continue
-        if is_latin_name(n):
-            out.extend(latin_name_variants(n))
-        else:
-            out.append(n)
-    return _dedupe(out)
+def unique_show_names(show, alt_names=None):
+    """中文名 + 英文名，去重，不做空格/点号变体。"""
+    return _dedupe([show, *(alt_names or [])])
 
 
 def season_episode_tag(season=None, episode=None):
@@ -75,16 +39,12 @@ def season_episode_tag(season=None, episode=None):
     return se
 
 
-def collect_show_aliases(primary, *extra):
-    """Merge user input + alt names for CN/EN bidirectional expansion."""
-    return _dedupe([primary, *extra])
-
-
 def build_pan_keywords(show, season=None, episode=None, extra="", alt_names=None):
     """
-    PanSou query variants: CN + EN aliases × spacing variants × broad/美剧/字幕.
+    网盘搜索 query：每个剧名 ×「字幕」，最多 2–4 条。
+    例：绝命毒师 字幕 · Breaking Bad 字幕 · 绝命毒师 S01E01 字幕
     """
-    names = expand_show_names(*collect_show_aliases(show, *(alt_names or [])))
+    names = unique_show_names(show, alt_names)
     se = season_episode_tag(season, episode)
     variants = []
 
@@ -92,46 +52,16 @@ def build_pan_keywords(show, season=None, episode=None, extra="", alt_names=None
         variants.append(extra.strip())
 
     for name in names:
-        base = f"{name} {se}".strip() if se else name
-        # broad first
-        if base != name:
-            variants.append(base)
-        variants.append(name)
+        variants.append(f"{name} 字幕")
         if se:
-            variants.append(f"{name} {se}")
-
-        # 美剧 / 字幕 — useful for CN queries and some EN
-        if not is_latin_name(name) or len(name) > 3:
-            variants.append(f"{name} 美剧")
-            if se:
-                variants.append(f"{name} {se} 美剧")
-        if base:
-            variants.extend([
-                f"{base} 字幕",
-                f"{name} 字幕 mkv",
-                f"{name} 中英字幕",
-            ])
-        else:
-            variants.extend([
-                f"{name} 字幕 mkv",
-                f"{name} 美剧 字幕",
-                f"{name} 中英字幕",
-            ])
-
-        # English releases often use dots in filenames
-        if is_latin_name(name) and " " in name:
-            dotted = name.replace(" ", ".")
-            if se:
-                variants.append(f"{dotted}.{se}")
-            variants.append(dotted)
+            variants.append(f"{name} {se} 字幕")
 
     return _dedupe(variants)
 
 
 def build_subtitle_queries(show, alt_names=None):
-    """CN + EN aliases; Latin spacing variants first, then Chinese."""
-    names = expand_show_names(*collect_show_aliases(show, *(alt_names or [])))
-    # Latin names first for subtitle DB
+    """字幕库搜索：英文优先，再中文。各试一次，不做变体。"""
+    names = unique_show_names(show, alt_names)
     latin = [n for n in names if is_latin_name(n)]
     other = [n for n in names if not is_latin_name(n)]
     return _dedupe(latin + other)

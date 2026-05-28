@@ -16,17 +16,17 @@ description: >-
 
 ## 步骤 1：用户输入 + Query 泛化
 
-**Agent 做，不跑脚本。**
+**Agent 做。** 提取剧名、季、集。
 
-从用户话里提取剧名、季、集。然后 **Query 泛化**（尽可能多）：
+**泛化只做 3 类 query（不要展开更多变体）：**
 
-- 中文 ↔ 英文互补（用户只给一种，你补另一种）
-- 英文变体：有空格 / 无空格 / 点号（`Breaking Bad` / `BreakingBad` / `Breaking.Bad`）
-- 可加：季集 `S01E01`、`美剧`、`字幕`
+| query | 示例 |
+|-------|------|
+| 中文 + 字幕 | `绝命毒师 字幕` |
+| 英文 + 字幕 | `Breaking Bad 字幕` |
+| 带季集（可选） | `绝命毒师 S01E01 字幕` |
 
-泛化规则详见 [know-how.md § Query 泛化](know-how.md#query-泛化)。
-
-传给后续脚本的参数：`show`（主名）+ `--sub-query`（别名）。
+传给脚本：`show`（中文主名）+ `--sub-query`（英文原名）。脚本最多试 **4 条** query，避免搜太久。
 
 ---
 
@@ -45,7 +45,7 @@ python3 ~/.cursor/skills/pan-drama-subtitle-search/scripts/pan_drama_search.py s
 | 参数 | 说明 |
 |------|------|
 | `show` | 主剧名 |
-| `--sub-query` | 别名（中/英都传，脚本自动泛化多种 query） |
+| `--sub-query` | 英文原名（与 show 组成中英文 + 字幕 query） |
 | `--season` / `--episode` | 季集 |
 | `--top` | 返回条数，默认 10 |
 | `--limit` | 搜索候选池，默认 80 |
@@ -155,49 +155,35 @@ python3 ~/.cursor/skills/pan-drama-subtitle-search/scripts/episode_match.py matc
 
 ### 4.4 完整 Case：《绝命毒师》S01E01
 
-```markdown
 ## 《绝命毒师》Breaking Bad · S01E01
-
-> 已搜字幕池 23 条 · 校验网盘 8 个 · 配对 4 行
 
 ### 一、视频 + 同分享字幕文件（最优先）
 
-> 分享内已有 `.srt` / `.ass`，与视频同目录，对轴最可靠。
-
 | # | 说明 | 网盘 | 字幕链接 | 匹配度 |
-|---|------|------|----------|--------|
-| 1 | 1080p WEB-DL 全五季 外挂中英 | [夸克](https://pan.quark.cn/s/xxxx) | [网盘内·中文](https://pan.quark.cn/s/xxxx) · [网盘内·英文](https://pan.quark.cn/s/xxxx) | high |
+|:--:|------|:----:|----------|:------:|
+| 1 | 1080p WEB-DL 全五季，分享内外挂中英 | [夸克](https://pan.quark.cn/s/xxxx) | [中文](https://pan.quark.cn/s/xxxx) · [英文](https://pan.quark.cn/s/xxxx) | high |
 
-**#1 匹配说明：** 同分享内有 `Breaking.Bad.S01E01.1080p.WEB-DL.mkv` + 同名 `.zh.srt` / `.en.srt`，可直接外挂。
+> **#1** 同分享内同名 `.mkv` + `.zh.srt` / `.en.srt`，可直接外挂。
 
 ### 二、视频 + 配对字幕链接
 
-> 视频与字幕经 OpenSubtitles 按文件名校对；下载视频后加载同行字幕。
-
 | # | 说明 | 网盘 | 字幕下载 | 类型 | 匹配度 |
-|---|------|------|----------|------|--------|
-| 2 | 1080p BluRay x265 单集 | [阿里](https://www.alipan.com/s/yyyy) | [中文](https://www.opensubtitles.org/en/subtitles/123/zh) · [英文](https://www.opensubtitles.org/en/subtitles/456/en) | 中+英（分开） | medium |
+|:--:|------|:----:|----------|------|:------:|
+| 2 | 1080p BluRay x265 单集 | [阿里](https://www.alipan.com/s/yyyy) | [中文](https://www.opensubtitles.org/en/subtitles/123/zh) · [英文](https://www.opensubtitles.org/en/subtitles/456/en) | 中+英 | medium |
 
-**#2 匹配说明：** 视频 BluRay 1080p，字幕来自 WEB-DL 版本（`version-mismatch`），集数对，时间轴可能需 VLC 微调。
+> **#2** 视频 BluRay，字幕来自 WEB-DL（`version-mismatch`），时间轴可能需 VLC 微调。
 
 ### 三、MKV 可能内封字幕（请你自查）
 
-> 可能已有内封字幕。请先 [自查](know-how.md#自查方法)——**有内封不用下外挂**；没有再用右侧链接。
+| # | 说明 | 网盘 | 若无内封→下载字幕 | 匹配度 |
+|:--:|------|:----:|-------------------|:------:|
+| 3 | 1080p 全五季，标题写内封简英 | [夸克](https://pan.quark.cn/s/zzzz) | [中文](https://www.opensubtitles.org/en/subtitles/123/zh) · [英文](https://www.opensubtitles.org/en/subtitles/456/en) | low |
 
-| # | 说明 | 网盘 | 如何自查 | 若无内封→下载字幕 | 匹配度 |
-|---|------|------|----------|-------------------|--------|
-| 3 | 1080p 全五季 内封简英 | [夸克](https://pan.quark.cn/s/zzzz) | [自查方法](know-how.md#自查方法) | [中文](https://www.opensubtitles.org/en/subtitles/123/zh) · [英文](https://www.opensubtitles.org/en/subtitles/456/en) | low |
-
-**#3 匹配说明：** 分享标题写「内封简英」但未验证；备用字幕仅按 S01E01 匹配，版本可能对不上。
+> **#3** VLC 字幕→子轨道自查；有内封不用下外挂。备用字幕可能对不上。
 
 ---
 
-**📚 学习用途说明**
-
-以上仅供**语言学习**（练听力、跟读、字幕对照），请勿传播。
-
-若只是观影娱乐，建议正版：**国内** 暂无统一流媒体全集，可搜哔哩哔哩部分片段；**国际** Netflix / Apple TV+ 等。
-```
+**📚 学习用途说明** — 仅供语言学习。观影请支持正版（Netflix / Apple TV+ 等）。
 
 ### 4.5 禁止
 

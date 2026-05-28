@@ -4,48 +4,19 @@
 
 ---
 
-## Query 泛化
+## Query 泛化（精简，避免搜太久）
 
-网盘搜索和字幕搜索都会**自动尝试多种 query**，不要只搜用户说的那一个词。
+只做 **中文 + 英文 + 字幕**，不做空格/点号/美剧等变体。
 
-### 为什么要泛化
+| query | 示例 |
+|-------|------|
+| 中文 + 字幕 | `绝命毒师 字幕` |
+| 英文 + 字幕 | `Breaking Bad 字幕` |
+| 带季集 | `绝命毒师 S01E01 字幕`、`Breaking Bad S01E01 字幕` |
 
-| 情况 | 示例 |
-|------|------|
-| 中文 vs 英文剧名 | 风骚律师 ↔ Better Call Saul |
-| 英文有空格 vs 无空格 | Better Call Saul ↔ BetterCallSaul |
-| 英文用点号分隔 | Better.Call.Saul（网盘文件名常见） |
-| 下划线写法 | Better_Call_Saul |
-| 美剧中文分享 | 剧名 + 「美剧」/「字幕」/「中英字幕」 |
+最多 **4 条** query。Agent：用户只给中文时补 `--sub-query` 英文原名。
 
-### 网盘搜索（pan / episode_match）
-
-`--sub-query` 传英文原名（或与 `show` 不同的别名），脚本会：
-
-1. 对每个剧名 alias 生成多种写法
-2. 依次尝试：纯剧名 → 剧名+S01E01 → 剧名+美剧 → 剧名+字幕 …
-3. 合并去重所有命中结果（**不**搜到一个就停）
-
-```bash
-# 中文搜网盘 + 英文别名泛化
-pan_drama_search.py search "风骚律师" --sub-query "Better Call Saul" --season 1 --episode 1
-```
-
-### 字幕搜索（subtitle_search / OpenSubtitles）
-
-字幕库以英文为主，优先用英文原名，同样泛化空格/点号：
-
-```bash
-subtitle_search.py find-episode "Better Call Saul" --sub-query "风骚律师" --season 1 --episode 1
-```
-
-内部会依次试：`Better Call Saul` → `BetterCallSaul` → `Better.Call.Saul` → … → 中文名，直到命中。
-
-### Agent 怎么做
-
-- 用户只说中文 → **主动补** `--sub-query` 英文原名（你知道的话）
-- 用户只说英文 → `show` 和 `--sub-query` 可相同，脚本仍会泛化空格/点号
-- 无结果时在回复里说明「已尝试哪些 query 变体」（看返回的 `keywords_tried` / `queries_tried`）
+字幕搜索：英文试一次，没有再试中文（各 1 次）。
 
 ---
 
@@ -61,11 +32,8 @@ subtitle_search.py find-episode "Better Call Saul" --sub-query "风骚律师" --
 
 | 策略 | 说明 |
 |------|------|
-| **Query 泛化** | 中英文别名 + 空格/无空格/点号，见 [§ Query 泛化](#query-泛化) |
-| 先 broad | 只搜剧名，命中率更高 |
-| 中英文都试 | `--sub-query` 传英文原名 |
-| 季集放参数 | `--season 1 --episode 1`，不要全塞进关键词 |
-| 避免「剧名+字幕」单查 | 泛化流程里会加，但 broad 优先 |
+| **Query 泛化** | 中英文剧名 + 字幕，见 [§ Query 泛化](#query-泛化精简避免搜太久) |
+| 季集放参数 | `--season 1 --episode 1` |
 | 放宽整季 | 单集搜不到 → 去掉 episode，搜整季包再在分享里找 S01E01 |
 
 ### 什么样的分享标题更靠谱
@@ -88,9 +56,7 @@ subtitle_search.py find-episode "Better Call Saul" --sub-query "风骚律师" --
 
 ### 搜字幕时的剧名
 
-- 用**英文原名**为主（`--sub-query` 或 find-episode 的第一个参数）
-- 脚本自动泛化：`Better Call Saul` / `BetterCallSaul` / `Better.Call.Saul`
-- 英文无结果再试中文别名
+- 用**英文原名**为主；无结果再试中文
 
 ### 语言优先级（语言学习场景）
 
